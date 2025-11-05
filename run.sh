@@ -30,6 +30,7 @@ function build {
 
 function release:test {
     clean
+    lint
     build
     publish:test
 }
