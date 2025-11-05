@@ -1,9 +1,14 @@
-name: Pylint
+name: Build, Test, and Publish
 
-on: [push]
+on: 
+  pull_request:
+    types: [opened, synchronize]
+  push:
+    branches:
+      - main 
 
 jobs:
-  build:
+  build-test-and-publish:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
