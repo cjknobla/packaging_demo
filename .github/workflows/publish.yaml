@@ -13,21 +13,41 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
+      with:
+        fetch-depth: '0' #get all historical branches...do not set to 0 if large repo
     - name: Set up Python 3.8
       uses: actions/setup-python@v3
       with:
         python-version: 3.8
+    - name: Tag with Release Version
+      run: |
+        git tag some-tag
     - name: install Python dependencies
       run: |
         /bin/bash -x run.sh install
+    - name: Lint, Format, and other static code quality checks
+      run: |
+        /bin/bash -x run.sh lint:ci
     - name: Build Python Package
       run: |
         /bin/bash -x run.sh build
+
     - name: Publish to Test PyPi
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       run: |
         /bin/bash -x run.sh publish:test
       env:
         TEST_PYPI_TOKEN: ${{ secrets.TEST_PYPI_TOKEN }}
+    - name: Publish to Prod PyPi
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      run: |
+        /bin/bash -x run.sh publish:prod
+      env:
+        TEST_PYPI_TOKEN: ${{ secrets.PROD_PYPI_TOKEN }}
+    - name: Push tags
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      run: |
+        git push origin --tags
 
   dump_contexts_to_log:
     runs-on: ubuntu-latest
