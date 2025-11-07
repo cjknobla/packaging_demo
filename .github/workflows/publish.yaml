@@ -1,29 +1,98 @@
 name: Build, Test, and Publish
 
-on: 
+on:
   pull_request:
     types: [opened, synchronize]
   push:
     branches:
-      - main 
+      - main
   workflow_dispatch:
 
 jobs:
-  build-test-and-publish:
+
+  check-version-txt:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
+      with:
+        fetch-depth: '0' #get all historical branches...do not set to 0 if large repo
+    - name: Tag with Release Version
+      run: |
+        git tag $(cat version.txt)
+
+  lint-format-and-static-code-checks:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python 3.0
+      uses: actions/setup-python@v3
+      with:
+        python-version: 3.8
+    - name: Install pre-commit
+      run: |
+        pip install pre-commit
+    - name: Lint, Format, and other static code quality checks
+      run: |
+        /bin/bash -x run.sh lint:ci
+
+  build-wheel-and-sdist:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: '0' #get all historical branches...do not set to 0 if large repo
     - name: Set up Python 3.8
       uses: actions/setup-python@v3
       with:
         python-version: 3.8
-    - run: |
-        /bin/bash run.sh install
-        /bin/bash run.sh build
-        /bin/bash run.sh publish:test
+    - name: install build cli
+      run: |
+        pip install build
+    - name: Build Python Package
+      run: |
+        /bin/bash -x run.sh build
+    - name: Upload package artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: wheel-and-sdist
+        path: ./dist/*
 
+
+  publish:
+    needs:
+      - build-wheel-and-sdist
+      - lint-format-and-static-code-checks
+      - check-version-txt
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python 3.0
+      uses: actions/setup-python@v3
+      with:
+        python-version: 3.8
+    - name: Download Wheel and sdist
+      uses: actions/download-artifact@v5
+      with:
+        name: wheel-and-sdist
+        path: ./dist/
+    - name: Install twine
+      run: |
+        pip install twine
+    - name: Publish to Test PyPi
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      run: |
+        /bin/bash -x run.sh publish:test
       env:
         TEST_PYPI_TOKEN: ${{ secrets.TEST_PYPI_TOKEN }}
+    - name: Publish to Prod PyPi
+      run: |
+        /bin/bash -x run.sh publish:prod
+      env:
+        TEST_PYPI_TOKEN: ${{ secrets.PROD_PYPI_TOKEN }}
+    - name: Push tags
+      run: |
+        git push origin --tags
 
   dump_contexts_to_log:
     runs-on: ubuntu-latest
