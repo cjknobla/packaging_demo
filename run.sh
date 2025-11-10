@@ -37,6 +37,19 @@ function build {
     python -m build --sdist --wheel "$THIS_DIR/"
 }
 
+function test:quick {
+    python -m pytest -m "not slow" "$THIS_DIR/tests/"
+}
+
+function test {
+    if [ $# -eq 0 ]; then
+        python -m pytest "$THIS_DIR/tests/"
+    else
+        python -m pytest "$@"
+    fi
+
+}
+
 function release:test {
     clean
     lint
