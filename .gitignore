@@ -6,3 +6,4 @@ dist
 .mypy_cache
 *.egg-info
 *.env
+test-reports

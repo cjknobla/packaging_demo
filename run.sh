@@ -17,7 +17,17 @@ function try-load-dotenv {
 }
 
 function clean {
-    rm -rf dist build
+    rm -rf dist build test-reports
+    find . \
+        -type d \
+        \( \
+            -name "*cache" \
+            -o -name "*.dist-info" \
+            -o -name "*.egg-info" \
+            -o -name "*htmlcov" \
+        \) \
+        -not -path "./venv/*" \
+        -exec rm -r {} +
 }
 
 function install {
@@ -38,16 +48,34 @@ function build {
 }
 
 function test:quick {
-    python -m pytest -m "not slow" "$THIS_DIR/tests/"
+    python -m pytest -m "not slow" "$THIS_DIR/tests/" \
+        --cov "$THIS_DIR/packaging_demo/" \
+        --cov-report html \
+        --cov-report term \
+        --cov-report xml \
+        --junit-xml "$THIS_DIR/test-reports/report.xml" \
+        --cov-fail-under 60 || ((PYTEST_EXIT_STATUS+=$?))
+    mv coverage.xml "$THIS_DIR/test-reports"
+    mv htmlcov "$THIS_DIR/test-reports"
+    return $PYTEST_EXIT_STATUS
 }
 
+# ./run.sh test tests/test_slow.py::test__slow_add__successful
 function test {
-    if [ $# -eq 0 ]; then
-        python -m pytest "$THIS_DIR/tests/"
-    else
-        python -m pytest "$@"
-    fi
+    python -m pytest "${@:-$THIS_DIR/tests/}" \
+    --cov "$THIS_DIR/packaging_demo/" \
+        --cov-report html \
+        --cov-report term \
+        --cov-report xml \
+        --junit-xml "$THIS_DIR/test-reports/report.xml" \
+        --cov-fail-under 70 || ((PYTEST_EXIT_STATUS+=$?))
+    mv coverage.xml "$THIS_DIR/test-reports"
+    mv htmlcov "$THIS_DIR/test-reports"
+    return $PYTEST_EXIT_STATUS
+}
 
+function serve-coverage-report {
+    python -m http.server --directory "$THIS_DIR/htmlcov/"
 }
 
 function release:test {
