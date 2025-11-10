@@ -57,9 +57,29 @@ jobs:
         name: wheel-and-sdist
         path: ./dist/*
 
+  execute-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python 3.0
+      uses: actions/setup-python@v3
+      with:
+        python-version: 3.8
+    - name: Download wheel and sdist
+      uses: actions/download-artifact@v5
+      with:
+        name: wheel-and-sdist
+        path: ./dist/
+    - name: Install test dependencies
+      run: |
+        pip install pytest pytest-cov ./dist/*.whl
+    - name: Run Tests
+      run: |
+        /bin/bash -x run.sh test:ci
 
   publish:
     needs:
+      - execute-tests
       - build-wheel-and-sdist
       - lint-format-and-static-code-checks
       - check-version-txt

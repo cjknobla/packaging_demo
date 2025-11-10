@@ -26,7 +26,7 @@ function clean {
             -o -name "*.egg-info" \
             -o -name "*htmlcov" \
         \) \
-        -not -path "./venv/*" \
+        -not -path "*env/*" \
         -exec rm -r {} +
 }
 
@@ -64,6 +64,47 @@ function test:quick {
 function test {
     python -m pytest "${@:-$THIS_DIR/tests/}" \
     --cov "$THIS_DIR/packaging_demo/" \
+        --cov-report html \
+        --cov-report term \
+        --cov-report xml \
+        --junit-xml "$THIS_DIR/test-reports/report.xml" \
+        --cov-fail-under 70 || ((PYTEST_EXIT_STATUS+=$?))
+    mv coverage.xml "$THIS_DIR/test-reports"
+    mv htmlcov "$THIS_DIR/test-reports"
+    return $PYTEST_EXIT_STATUS
+}
+
+function test:wheel-locally {
+    source deactivate || true
+    rm -rf test-env || true
+    python -m venv test-env
+    source test-env/bin/activate
+    clean
+    pip install build
+    build
+
+    PYTESTS_EXIT_STATUS=0
+    pip install ./dist/*.whl pytest pytest-cov
+    INSTALL_PKG_DIR="$(python -c 'import packaging_demo; print(packaging_demo.__path__[0])')"
+    python -m pytest "${@:-$THIS_DIR/tests/}" \
+    --cov "$INSTALL_PKG_DIR" \
+        --cov-report html \
+        --cov-report term \
+        --cov-report xml \
+        --junit-xml "$THIS_DIR/test-reports/report.xml" \
+        --cov-fail-under 70 || ((PYTEST_EXIT_STATUS+=$?))
+    mv coverage.xml "$THIS_DIR/test-reports"
+    mv htmlcov "$THIS_DIR/test-reports"
+
+    source deactivate
+    return $PYTEST_EXIT_STATUS
+}
+
+function test:ci {
+    PYTESTS_EXIT_STATUS=0
+    INSTALL_PKG_DIR="$(python -c 'import packaging_demo; print(packaging_demo.__path__[0])')"
+    python -m pytest "${@:-$THIS_DIR/tests/}" \
+    --cov "$INSTALL_PKG_DIR" \
         --cov-report html \
         --cov-report term \
         --cov-report xml \
